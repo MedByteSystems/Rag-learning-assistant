@@ -17,9 +17,31 @@ Built with **FastAPI, Ollama, ChromaDB, PyMuPDF and Python**.
 
 ## Architecture
 
-![RAG Scholar architecture](docs/images/architecture.svg)
+```mermaid
+flowchart LR
+    UI["Web UI<br/>HTML · CSS · JavaScript"] --> API["FastAPI Backend<br/>REST API"]
 
-### Logical flow
+    UI -->|"PDF upload"| API
+    API -->|"chat request"| ROUTER["Router Agent<br/>Rules / Regex<br/>LLM fallback"]
+
+    ROUTER -->|"answer / summary / quiz"| RAG["RAG Agent"]
+    ROUTER -->|"general"| GENERAL["General Agent"]
+
+    API <--> MEMORY["Memory Agent<br/>Sliding history"]
+    MEMORY --> RAG
+    MEMORY --> GENERAL
+
+    API -->|"background indexing"| PDF["PDF Processor<br/>PyMuPDF<br/>chunking + page metadata"]
+    PDF --> VS["ChromaDB<br/>Persistent Vector Store<br/>Cosine similarity · Top-K"]
+
+    RAG -->|"retrieve chunks"| VS
+    VS -->|"embeddings"| OLLAMA["Ollama<br/>Local LLM + Embeddings"]
+    ROUTER -->|"ambiguous intent"| OLLAMA
+    RAG -->|"grounded generation"| OLLAMA
+    GENERAL -->|"generation"| OLLAMA
+```
+
+### Logical RAG flow
 
 ```text
 PDF Upload
@@ -28,7 +50,7 @@ Text Extraction (PyMuPDF)
     ↓
 Chunking + Page Metadata
     ↓
-Embeddings (nomic-embed-text)
+Embeddings via Ollama
     ↓
 ChromaDB Vector Store
     ↓
@@ -36,12 +58,11 @@ User Query
     ↓
 Router Agent
     ├── RAG Agent → answer / summary / quiz
-    ├── General Agent → general conversation
-    └── Memory Agent → conversation context
+    └── General Agent → general conversation
     ↓
 Ollama Local LLM
     ↓
-Grounded Response + Sources
+Response + Sources
 ```
 
 ## Multi-Agent Architecture
@@ -71,7 +92,7 @@ Implements the retrieval-augmented generation workflow:
 
 ### Memory Agent
 
-Maintains a sliding window of recent conversation turns and provides context to the LLM for conversational continuity.
+Maintains a sliding window of recent conversation turns and provides context to the RAG and General agents.
 
 ### General Agent
 
@@ -149,19 +170,23 @@ The frontend provides:
 - Interactive quizzes
 - Ollama / API health status
 
-### Recommended portfolio screenshots
+### Screenshots
 
-Add the following real screenshots under `docs/images/`:
+#### Main interface
 
-| File | What it should show |
-|---|---|
-| `ui-overview.png` | Main RAG Scholar interface |
-| `rag-answer.png` | RAG answer with displayed source and page |
-| `quiz-mode.png` | Generated quiz and answer feedback |
-| `pdf-indexing.png` | Uploaded PDF visible in the document list |
-| `swagger.png` | FastAPI interactive API documentation |
+![RAG Scholar UI](docs/images/ui_overview.png)
 
-These screenshots should show the actual running application rather than mockups.
+#### RAG answer with sources
+
+![RAG answer](docs/images/rag-answer.png)
+
+#### Quiz mode
+
+![Quiz mode](docs/images/quiz-mode.png)
+
+#### PDF indexing
+
+![PDF indexing](docs/images/pdf-indexing.png)
 
 ## Project Structure
 
@@ -186,9 +211,14 @@ rag-learning-assistant/
 │   └── vectorstore/
 ├── docs/
 │   └── images/
-│       └── architecture.svg
+│       ├── ui_overview.png
+│       ├── rag-answer.png
+│       ├── quiz-mode.png
+│       └── pdf-indexing.png
 ├── requirements.txt
 ├── start.sh
+├── .env.example
+├── .gitignore
 ├── commandes.txt
 └── README.md
 ```
