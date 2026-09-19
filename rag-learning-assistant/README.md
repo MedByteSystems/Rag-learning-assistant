@@ -1,252 +1,293 @@
-# 📚 RAG Learning Assistant
-### Assistant d'apprentissage intelligent — IA Distribuée & Systèmes Multi-Agents
+# RAG Scholar — Multi-Agent Learning Assistant
 
-> Architecture RAG locale avec Ollama · FastAPI · ChromaDB · Multi-Agents
+### Local-first RAG application for interactive learning from PDF courses
 
----
+RAG Scholar is a local AI learning assistant that combines **Retrieval-Augmented Generation (RAG)** with a **multi-agent architecture**. Students can upload course PDFs, ask questions grounded in those documents, generate summaries and create interactive quizzes.
 
-## 🏗 Architecture Système
+Built with **FastAPI, Ollama, ChromaDB, PyMuPDF and Python**.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    ÉTUDIANT (UI Web)                    │
-│              http://localhost:8000                       │
-└───────────────────────┬─────────────────────────────────┘
-                        │ HTTP/REST
-                        ▼
-┌─────────────────────────────────────────────────────────┐
-│              ROUTER AGENT (Cerveau)                     │
-│    Analyse l'intention → classe en 4 catégories         │
-│    ┌──────────┬──────────┬──────────┬──────────┐       │
-│    │  règles  │  regex   │ LLM class│ fallback │       │
-│    └──────────┴──────────┴──────────┴──────────┘       │
-└───────┬─────────────────────┬───────────────────────────┘
-        │                     │
-        ▼                     ▼
-┌──────────────┐    ┌──────────────────────┐
-│GENERAL AGENT │    │    RAG AGENT         │
-│ Chat basique │    │  ┌────────────────┐  │
-│ Historique   │    │  │ Mode: answer   │  │
-│ inclus       │    │  │ Mode: summary  │  │
-└──────┬───────┘    │  │ Mode: quiz     │  │
-       │            │  └────────┬───────┘  │
-       │            └──────────┼───────────┘
-       │                       │
-       │            ┌──────────▼───────────┐
-       │            │   VECTOR STORE       │
-       │            │   ChromaDB           │
-       │            │   embeddings Ollama  │
-       │            └──────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────────────────────┐
-│             MEMORY AGENT (Historique)                   │
-│         Fenêtre glissante de N tours                    │
-│         Injecté dans chaque requête LLM                 │
-└─────────────────────────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────────────────────┐
-│              OLLAMA (LLM Local)                         │
-│   mistral / llama3 / phi3 / gemma2 ...                  │
-│   nomic-embed-text (embeddings)                         │
-└─────────────────────────────────────────────────────────┘
+## What the project demonstrates
+
+- **RAG pipeline:** PDF → text extraction → chunking → embeddings → vector retrieval → grounded generation
+- **Multi-agent routing:** a Router Agent selects the appropriate agent and mode
+- **Source grounding:** answers expose the source file and page used by retrieval
+- **Conversational memory:** recent turns are retained and injected into the LLM context
+- **Local LLM inference:** chat and embeddings run through Ollama
+- **Web application:** REST API + browser-based interface
+
+## Architecture
+
+![RAG Scholar architecture](docs/images/architecture.svg)
+
+### Logical flow
+
+```text
+PDF Upload
+    ↓
+Text Extraction (PyMuPDF)
+    ↓
+Chunking + Page Metadata
+    ↓
+Embeddings (nomic-embed-text)
+    ↓
+ChromaDB Vector Store
+    ↓
+User Query
+    ↓
+Router Agent
+    ├── RAG Agent → answer / summary / quiz
+    ├── General Agent → general conversation
+    └── Memory Agent → conversation context
+    ↓
+Ollama Local LLM
+    ↓
+Grounded Response + Sources
 ```
 
----
+## Multi-Agent Architecture
 
-## 📂 Structure du projet
+### Router Agent
 
+Acts as the entry point for intent detection. It uses fast rule-based classification first and an **LLM fallback** for ambiguous requests.
+
+Supported routes:
+
+| Intent | Agent | Mode |
+|---|---|---|
+| Course question | RAG Agent | answer |
+| Summary request | RAG Agent | summary |
+| Practice request | RAG Agent | quiz |
+| General conversation | General Agent | general |
+
+### RAG Agent
+
+Implements the retrieval-augmented generation workflow:
+
+1. Retrieve the most relevant chunks from ChromaDB
+2. Build a document context
+3. Inject the context into the LLM prompt
+4. Generate a grounded response
+5. Return source file, page and similarity information
+
+### Memory Agent
+
+Maintains a sliding window of recent conversation turns and provides context to the LLM for conversational continuity.
+
+### General Agent
+
+Handles general questions that do not require document retrieval.
+
+## RAG Pipeline
+
+### Document ingestion
+
+PDF documents are processed with **PyMuPDF**. Text is extracted page by page and divided into overlapping chunks.
+
+Default configuration:
+
+```text
+Chunk size       : 512 words
+Chunk overlap    : 64 words
+Top-K retrieval  : 5 chunks
 ```
+
+Page metadata is preserved so retrieved information can be traced back to the original document.
+
+### Embeddings and retrieval
+
+Embeddings are generated locally with:
+
+```text
+nomic-embed-text
+```
+
+ChromaDB stores the vectors using cosine similarity and retrieves the most relevant chunks for each query.
+
+### Generation
+
+Ollama provides the local LLM used for:
+
+- grounded answers
+- summaries
+- quiz generation
+- intent classification when rule-based routing is ambiguous
+
+## Features
+
+### RAG answer
+
+- Ask questions about uploaded courses
+- Generate answers from retrieved document context
+- Display source filename and page
+
+### Summary
+
+- Generate structured summaries from course content
+- Highlight key concepts and important points
+
+### Quiz
+
+- Generate exactly five multiple-choice questions
+- Return answers and explanations
+- Interactive answer checking in the web interface
+
+### Memory
+
+- Sliding conversation history
+- Recent context injected into LLM prompts
+- Ability to clear the current session history
+
+## Web Interface
+
+The frontend provides:
+
+- Automatic agent routing
+- Explicit answer / summary / quiz modes
+- PDF upload and document management
+- Chat history
+- Source display
+- Interactive quizzes
+- Ollama / API health status
+
+### Recommended portfolio screenshots
+
+Add the following real screenshots under `docs/images/`:
+
+| File | What it should show |
+|---|---|
+| `ui-overview.png` | Main RAG Scholar interface |
+| `rag-answer.png` | RAG answer with displayed source and page |
+| `quiz-mode.png` | Generated quiz and answer feedback |
+| `pdf-indexing.png` | Uploaded PDF visible in the document list |
+| `swagger.png` | FastAPI interactive API documentation |
+
+These screenshots should show the actual running application rather than mockups.
+
+## Project Structure
+
+```text
 rag-learning-assistant/
-├── 📄 README.md
-├── 📄 requirements.txt
-├── 📄 .env.example
-│
-├── 🐍 backend/
-│   ├── main.py              # FastAPI — point d'entrée API
-│   ├── config.py            # Configuration pydantic-settings
-│   │
+├── backend/
 │   ├── agents/
-│   │   ├── router.py        # 🧠 Cerveau : route vers le bon agent
-│   │   ├── rag_agent.py     # 📚 Agent RAG (answer | summary | quiz)
-│   │   ├── memory_agent.py  # 💾 Agent Mémoire (historique glissant)
-│   │   └── general_agent.py # 💬 Agent Général (chat basique)
-│   │
-│   └── core/
-│       ├── ollama_client.py # 🤖 Client Ollama (chat + embeddings)
-│       ├── vector_store.py  # 🗃 ChromaDB (indexation + recherche)
-│       └── pdf_processor.py # 📄 Extraction + chunking des PDFs
-│
-├── 🌐 frontend/
-│   └── index.html           # UI web (dark academic design)
-│
-└── 📁 data/
-    ├── uploads/             # PDFs téléversés
-    └── vectorstore/         # Base ChromaDB (persistée)
+│   │   ├── router.py
+│   │   ├── rag_agent.py
+│   │   ├── memory_agent.py
+│   │   └── general_agent.py
+│   ├── core/
+│   │   ├── ollama_client.py
+│   │   ├── vector_store.py
+│   │   └── pdf_processor.py
+│   ├── config.py
+│   └── main.py
+├── frontend/
+│   └── index.html
+├── data/
+│   ├── uploads/
+│   └── vectorstore/
+├── docs/
+│   └── images/
+│       └── architecture.svg
+├── requirements.txt
+├── start.sh
+├── commandes.txt
+└── README.md
 ```
 
----
+## Technology Stack
 
-## ⚙️ Installation
+| Layer | Technologies |
+|---|---|
+| Language | Python |
+| API | FastAPI · Uvicorn |
+| LLM | Ollama |
+| Embeddings | nomic-embed-text |
+| RAG | Retrieval-Augmented Generation |
+| Vector Store | ChromaDB |
+| PDF Processing | PyMuPDF |
+| Agents | Router · RAG · Memory · General |
+| Validation / Retry | Pydantic · Tenacity |
+| Frontend | HTML · CSS · JavaScript |
 
-### 1. Prérequis
+## Installation
 
-```bash
-# Python 3.11+
-python --version
+### Requirements
 
-# Ollama
-curl -fsSL https://ollama.com/install.sh | sh
-```
+- Python 3.11+
+- Ollama
+- Sufficient RAM for the selected local LLM
 
-### 2. Télécharger les modèles Ollama
-
-```bash
-# Modèle de chat (choisir selon votre RAM)
-ollama pull mistral          # 4.1 Go — recommandé
-# ollama pull llama3          # 4.7 Go — très bon
-# ollama pull phi3            # 2.3 Go — léger
-# ollama pull gemma2          # 5.4 Go — excellent
-
-# Modèle d'embeddings (obligatoire)
-ollama pull nomic-embed-text # 274 Mo
-```
-
-### 3. Installer les dépendances Python
+### Install Python dependencies
 
 ```bash
-# Cloner / extraire le projet
-cd rag-learning-assistant
-
-# Créer l'environnement virtuel
 python -m venv .venv
-source .venv/bin/activate      # Linux/Mac
-# .venv\Scripts\activate       # Windows
 
-# Installer
+# Linux / macOS
+source .venv/bin/activate
+
+# Windows
+.venv\\Scripts\\activate
+
 pip install -r requirements.txt
 ```
 
-### 4. Configuration (optionnel)
+### Download Ollama models
 
 ```bash
-cp .env.example .env
-# Éditer .env pour changer le modèle, les ports, etc.
+ollama pull llama3.2:3b
+ollama pull nomic-embed-text
 ```
 
----
-
-## 🚀 Lancement
+### Start the application
 
 ```bash
-# Terminal 1 — Ollama
 ollama serve
-
-# Terminal 2 — API FastAPI
 python -m uvicorn backend.main:app --reload --port 8000
-
-# Ouvrir le navigateur
-# http://localhost:8000
 ```
 
----
+Open:
 
-## 🎮 Utilisation
+- `http://localhost:8000` — Web application
+- `http://localhost:8000/docs` — Swagger UI
+- `http://localhost:8000/redoc` — ReDoc
 
-### Interface web
-1. **Charger un PDF** → clic sur "Ajouter un PDF" dans la sidebar
-2. **Attendre l'indexation** (~30s selon la taille du document)
-3. **Choisir un mode** (ou laisser "Auto" pour le routage automatique)
-4. **Poser une question** dans le chat
+## Configuration
 
-### Modes disponibles
-| Mode | Description | Exemple |
-|------|-------------|---------|
-| 🧠 Auto | Le Router analyse l'intention | Toute question |
-| 🔍 Réponse précise | RAG + citation sources | "Qu'est-ce que le gradient ?" |
-| 📝 Résumé | Synthèse structurée du cours | "Résume ce chapitre" |
-| 🎯 Quiz | 5 QCM interactifs | "Génère un quiz sur TCP/IP" |
-
-### API REST
-
-```bash
-# Chat
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Explique le théorème de Bayes", "mode": "auto"}'
-
-# Upload PDF
-curl -X POST http://localhost:8000/documents/upload \
-  -F "file=@mon_cours.pdf"
-
-# Lister les documents
-curl http://localhost:8000/documents
-
-# Santé du système
-curl http://localhost:8000/health
-
-# Effacer l'historique
-curl -X DELETE http://localhost:8000/memory
-```
-
-### Documentation interactive
-- Swagger UI : http://localhost:8000/docs
-- ReDoc : http://localhost:8000/redoc
-
----
-
-## 🧠 Détail des Agents
-
-### Router Agent (Cerveau)
-Analyse l'intention utilisateur en 2 étapes :
-1. **Classification par règles** (regex, rapide) → quiz / summary / answer / general
-2. **Classification LLM** (si cas ambigu) → appel Ollama avec temperature=0
-
-### RAG Agent
-- **Embed** la question avec `nomic-embed-text`
-- **Recherche** les K chunks les plus proches (cosine similarity dans ChromaDB)
-- **Génère** la réponse avec le contexte injecté dans le prompt
-- Modes : `answer` (précis) · `summary` (structuré) · `quiz` (JSON QCM)
-
-### Memory Agent
-- Fenêtre glissante de **10 tours** (configurable)
-- Injecté dans chaque appel LLM pour la cohérence conversationnelle
-- Stats : nombre de tours, heure de début de session
-
-### General Agent
-- Chat standard sans RAG
-- Utilise l'historique conversationnel complet
-- Redirige vers le mode RAG si besoin
-
----
-
-## 🔧 Configuration avancée
+Main settings are defined in `backend/config.py` and can be overridden through `.env`.
 
 ```env
-OLLAMA_MODEL=mistral           # Modèle LLM
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2:3b
 OLLAMA_EMBED_MODEL=nomic-embed-text
-CHUNK_SIZE=512                 # Mots par chunk
-CHUNK_OVERLAP=64               # Chevauchement entre chunks
-TOP_K=5                        # Chunks récupérés par requête
-MAX_HISTORY_TURNS=10           # Historique conversationnel
+CHUNK_SIZE=512
+CHUNK_OVERLAP=64
+TOP_K=5
+MAX_HISTORY_TURNS=10
+API_HOST=0.0.0.0
+API_PORT=8000
 ```
 
----
+## REST API
 
-## 📊 Concepts IA Distribuée illustrés
+Main endpoints:
 
-| Concept | Implémentation |
-|---------|----------------|
-| **Agent autonome** | Chaque agent (RAG, Memory, General) est indépendant |
-| **Orchestrateur** | Router centralise la décision de routage |
-| **RAG** | ChromaDB + nomic-embed-text + Ollama |
-| **Mémoire partagée** | MemoryAgent accessible par tous les agents |
-| **Traitement asynchrone** | FastAPI async + BackgroundTasks pour l'indexation |
-| **Séparation des responsabilités** | Un agent = une responsabilité |
-| **Tolérance aux pannes** | Retry (tenacity) sur les appels Ollama |
+```text
+POST   /chat
+POST   /documents/upload
+GET    /documents
+DELETE /documents/{filename}
+GET    /memory
+DELETE /memory
+GET    /health
+```
 
----
+Interactive documentation is available through Swagger UI at `/docs` when the application is running.
 
-## 📝 Licence
-Projet académique — Module IA Distribuée & Systèmes Multi-Agents
+## Academic Context
+
+Project developed for the **IA Distribuée & Systèmes Multi-Agents** module.
+
+The project focuses on applying RAG, local LLM inference and agent-based orchestration to an educational use case.
+
+## License
+
+Academic project.
