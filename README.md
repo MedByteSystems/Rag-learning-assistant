@@ -1,4 +1,4 @@
-# RAG Scholar — Multi-Agent Learning Assistant
+# RAG  — Multi-Agent Learning Assistant
 
 Local-first RAG application for studying from PDF courses, combining **FastAPI, Ollama, ChromaDB, embeddings and specialized AI agents**.
 
