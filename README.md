@@ -1,4 +1,4 @@
-# RAG  — Multi-Agent Learning Assistant
+# RAG Scholar — Multi-Agent Learning Assistant
 
 Local-first RAG application for studying from PDF courses, combining **FastAPI, Ollama, ChromaDB, embeddings and specialized AI agents**.
 
@@ -20,30 +20,47 @@ See the full implementation in **rag-learning-assistant/**.
 - General chat mode
 - FastAPI REST API and web interface
 
-### Architecture
+## Architecture
 
-![Multi-Agent RAG Architecture](rag-learning-assistant/docs/images/architecture.svg)
+```mermaid
+flowchart LR
+    UI["Web UI<br/>HTML · CSS · JavaScript"] --> API["FastAPI Backend<br/>REST API"]
+    UI -->|"PDF upload"| API
+    API -->|"chat request"| ROUTER["Router Agent<br/>Rules / Regex<br/>LLM fallback"]
+    ROUTER -->|"answer / summary / quiz"| RAG["RAG Agent"]
+    ROUTER -->|"general"| GENERAL["General Agent"]
+    API <--> MEMORY["Memory Agent<br/>Sliding history"]
+    MEMORY --> RAG
+    MEMORY --> GENERAL
+    API -->|"background indexing"| PDF["PDF Processor<br/>PyMuPDF<br/>chunking + page metadata"]
+    PDF --> VS["ChromaDB<br/>Persistent Vector Store<br/>Cosine similarity · Top-K"]
+    RAG -->|"retrieve chunks"| VS
+    VS -->|"embeddings"| OLLAMA["Ollama<br/>Local LLM + Embeddings"]
+    ROUTER -->|"ambiguous intent"| OLLAMA
+    RAG -->|"grounded generation"| OLLAMA
+    GENERAL -->|"generation"| OLLAMA
+```
 
-### Stack
+## Screenshots
+
+### Main interface
+
+![RAG Scholar UI](rag-learning-assistant/docs/images/ui_overview.png)
+
+### RAG answer with sources
+
+![RAG answer](rag-learning-assistant/docs/images/rag-answer.png)
+
+### Quiz mode
+
+![Quiz mode](rag-learning-assistant/docs/images/quiz-mode.png)
+
+### PDF indexing
+
+![PDF indexing](rag-learning-assistant/docs/images/pdf-indexing.png)
+
+## Stack
 
 **Python · FastAPI · Ollama · ChromaDB · PyMuPDF · Embeddings · RAG · AI Agents · REST API**
 
-## Screenshots to add
-
-For the portfolio, the most useful screenshots are:
-
-1. **Main UI** — the application with the sidebar, modes and chat area.
-2. **RAG answer** — a question answered from a PDF with the displayed source and page.
-3. **Quiz mode** — generated QCM with answer feedback.
-4. **PDF indexing** — uploaded document visible in the document list.
-
-Recommended location:
-
-```text
-rag-learning-assistant/docs/images/
-├── architecture.svg
-├── ui-overview.png
-├── rag-answer.png
-├── quiz-mode.png
-└── pdf-indexing.png
-```
+For installation, configuration, REST endpoints and the full technical explanation, see the project README in **rag-learning-assistant/**.
